@@ -1,28 +1,22 @@
-using UnityEngine;
 using TMPro;
+using UnityEngine;
+using System.Collections;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
 
     public TextMeshProUGUI messageText;
-
     public GameObject ballBlack;
     public GameObject ballWhite;
-
     public Transform boardParent;
 
-    [Header("高さの間隔（1段ごとのY座標）")]
-    public float ySpacing = 1.0f;  // ← ここで高さ調整できる
+    public float ySpacing = 1f;
 
-    private int currentPlayer = 1; // 1: Black, 2: White
+    public bool isGameOver = false; // ← ★追加：操作ロック用
+
+    private int currentPlayer = 1;
     public Board board;
-
-    void Start()
-    {
-        Cursor.visible = true;
-        Cursor.lockState = CursorLockMode.None;
-    }
 
     void Awake()
     {
@@ -30,29 +24,48 @@ public class GameManager : MonoBehaviour
         board = new Board();
     }
 
-    public void PlacePieceAtPosition(Vector3 basePosition, int x, int y, int z)
+    void Start()
     {
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
+    }
+
+    public void PlacePieceAtPosition(Vector3 position, int x, int y, int z)
+    {
+        if (isGameOver) return; // ★すでに勝利済みなら玉を置かせない
+
         GameObject prefab = (currentPlayer == 1) ? ballBlack : ballWhite;
-
-        // 見た目の積み高さを ySpacing に応じて調整
-        Vector3 spawnPos = new Vector3(basePosition.x, y * ySpacing + 1, basePosition.z);
-
-        Instantiate(prefab, spawnPos, Quaternion.identity, boardParent);
+        Instantiate(prefab, position, Quaternion.identity, boardParent);
 
         board.SetCell(x, y, z, currentPlayer);
 
         if (board.CheckWin(x, y, z, currentPlayer))
         {
-            Debug.Log($"Player {currentPlayer} wins!");
-            
-            messageText.text = $"{currentPlayer} win !"; // ★ここで表示
+            isGameOver = true;
+            messageText.text = $"player{currentPlayer} win.";
+            StartCoroutine(RestartGameAfterDelay(3f)); // ★3秒後にリセット
             return;
         }
 
         currentPlayer = (currentPlayer == 1) ? 2 : 1;
     }
 
-    
+    private IEnumerator RestartGameAfterDelay(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        ResetGame();
+    }
 
-    
+    private void ResetGame()
+    {
+        isGameOver = false;
+        board = new Board(); // 新しい盤面に差し替え
+        currentPlayer = 1;
+        messageText.text = "";
+
+        foreach (Transform child in boardParent)
+        {
+            Destroy(child.gameObject); // 玉を全部削除
+        }
+    }
 }
